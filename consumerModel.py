@@ -3,7 +3,9 @@ import sys
 import json
 from kafka import KafkaConsumer, KafkaProducer
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 from pyspark.ml import PipelineModel
+from pyspark.ml.feature import StringIndexerModel
 from pyspark.sql import Row
 
 # -----------------------------
@@ -36,24 +38,19 @@ producer = KafkaProducer(
 # -----------------------------
 spark = SparkSession.builder.appName(
     "GalaxyClassification-Consumer").getOrCreate()
-MODEL_PATH = "galaxy_rf_pipeline_model"
+# MODEL_PATH = "galaxy_rf_pipeline_model"
+MODEL_PATH = "full_pipeline_model"
 model = PipelineModel.load(MODEL_PATH)
 print("Spark model loaded successfully")
 
 # -----------------------------
-# Get feature columns from training data
+# Get class names
 # -----------------------------
-train_df = spark.read.csv("clean.csv", header=True, inferSchema=True)
-feature_cols = [c for c in train_df.columns if c != "class"]
+for stage in model.stages:
+    if isinstance(stage, StringIndexerModel) and stage.getOutputCol() == "label_index":
+        class_names = stage.labels
 
-# Map numeric label to class name
-class_names = (
-    train_df.select("class")
-    .distinct()
-    .orderBy("class")
-    .rdd.flatMap(lambda x: x)
-    .collect()
-)
+features = ["u", "g", "r", "i", "z", "u_g", "g_r", "r_i", "i_z"]
 
 # -----------------------------
 # Continuous listening loop
@@ -67,6 +64,10 @@ try:
 
         # Convert dict to Spark DataFrame
         input_df = spark.createDataFrame([Row(**data)])
+        input_df = input_df.withColumn("u_g", col("u") - col("g")) \
+            .withColumn("g_r", col("g") - col("r")) \
+            .withColumn("r_i", col("r") - col("i")) \
+            .withColumn("i_z", col("i") - col("z"))
 
         # Predict
         predictions = model.transform(input_df)

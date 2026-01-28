@@ -27,13 +27,6 @@ consumer = KafkaConsumer(
 # Thread-safe queue for predictions
 pred_queue = queue.Queue()
 
-# Map numeric predictions to human-readable classes
-CLASS_MAP = {
-    0: "Galaxy",
-    1: "Star",
-    2: "Quasar"
-}
-
 # -----------------------------
 # GUI setup
 # -----------------------------
@@ -56,14 +49,11 @@ class GalaxyProducerApp:
 
         # Features (internal name, display label with emoji)
         self.features = [
-            ("u", "💜 Ultraviolet"),
-            ("g", "💚 Green"),
-            ("r", "❤️ Red"),
-            ("i", "🔴 Near Infrared"),
-            ("z", "🟥 Infrared"),
-            ("redshift", "🌈 Redshift"),
-            ("plate", "🛡️ Plate ID"),
-            ("MJD", "📅 MJD")
+            ("u", "u"),
+            ("g", "g"),
+            ("r", "r"),
+            ("i", "i"),
+            ("z", "z")
         ]
         self.entries = {}
         for field_name, label_text in self.features:
@@ -128,7 +118,8 @@ class GalaxyProducerApp:
     def check_queue(self):
         while not pred_queue.empty():
             prediction = pred_queue.get()
-            class_name = CLASS_MAP.get(prediction, "Unknown")
+            # class_name = CLASS_MAP.get(prediction, "Unknown")
+            class_name = prediction
             self.update_prediction_field(class_name)
         self.root.after(100, self.check_queue)
 
