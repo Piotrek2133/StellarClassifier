@@ -38,7 +38,7 @@ class GalaxyProducerApp:
     def __init__(self, root):
         self.root = root
         self.root.title("🌌 Galaxy Classifier ✨")
-        self.root.geometry("500x580")
+        self.root.geometry("500x620")
         self.root.resizable(False, False)
 
         # Header
@@ -55,16 +55,33 @@ class GalaxyProducerApp:
             ("i", "i"),
             ("z", "z")
         ]
+        self.features2 = [
+            ("u", "u"),
+            ("g", "g"),
+            ("r", "r"),
+            ("i", "i"),
+            ("z", "z"),
+            ("redshift", "Redshift"),
+            ("plate", "Plate"),
+            ("MJD", "MJD")
+        ]
+        # Model selector (m1 or m2)
+        self.model_var = ctk.StringVar(value="m1")
+        model_frame = ctk.CTkFrame(root, fg_color="#2F3136", corner_radius=10)
+        model_frame.pack(pady=5, padx=20, fill="x")
+        model_label = ctk.CTkLabel(model_frame, text="Model:", width=100, anchor="w")
+        model_label.pack(side="left", padx=5)
+        self.model_menu = ctk.CTkOptionMenu(model_frame, values=["m1", "m2"], command=self.change_model)
+        self.model_menu.set("m1")
+        self.model_menu.pack(side="left", padx=5)
+
+        # Container for feature input fields
+        self.form_frame = ctk.CTkFrame(root, fg_color="transparent")
+        self.form_frame.pack(pady=5, padx=20, fill="x")
+
+        # Build initial fields for m1
         self.entries = {}
-        for field_name, label_text in self.features:
-            frame = ctk.CTkFrame(root, fg_color="#2F3136", corner_radius=10)
-            frame.pack(pady=5, padx=20, fill="x")
-            label = ctk.CTkLabel(
-                frame, text=f"{label_text}:", width=100, anchor="w")
-            label.pack(side="left", padx=5)
-            entry = ctk.CTkEntry(frame)
-            entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
-            self.entries[field_name] = entry
+        self.build_fields(self.features)
 
         # Send button
         self.send_button = ctk.CTkButton(
@@ -97,13 +114,42 @@ class GalaxyProducerApp:
     # -----------------------------
     def send_data(self):
         try:
+            model = self.model_menu.get() if hasattr(self, "model_menu") else "m1"
+            if model == "m1":
+                feature_list = self.features
+            else:
+                feature_list = self.features2
+
             data = {field_name: float(self.entries[field_name].get())
-                    for field_name, _ in self.features}
-            producer.send(DATA_TOPIC, value=data)
+                    for field_name, _ in feature_list}
+            # Send model name as first parameter
+            payload = [model, data]
+            producer.send(DATA_TOPIC, value=payload)
             producer.flush()
             self.update_prediction_field("Waiting for prediction...")
         except ValueError:
             self.update_prediction_field("❌ Invalid input! Use numbers only.")
+
+    def build_fields(self, feature_list):
+        # Clear previous widgets
+        for child in self.form_frame.winfo_children():
+            child.destroy()
+        self.entries = {}
+        for field_name, label_text in feature_list:
+            frame = ctk.CTkFrame(self.form_frame, fg_color="#2F3136", corner_radius=10)
+            frame.pack(pady=5, fill="x")
+            label = ctk.CTkLabel(frame, text=f"{label_text}:", width=100, anchor="w")
+            label.pack(side="left", padx=5)
+            entry = ctk.CTkEntry(frame)
+            entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
+            self.entries[field_name] = entry
+
+    def change_model(self, choice):
+        # Update input fields based on selected model
+        if choice == "m1":
+            self.build_fields(self.features)
+        else:
+            self.build_fields(self.features2)
 
     # -----------------------------
     # Kafka listener for predictions

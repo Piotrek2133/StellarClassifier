@@ -38,20 +38,23 @@ producer = KafkaProducer(
 # -----------------------------
 spark = SparkSession.builder.appName(
     "GalaxyClassification-Consumer").getOrCreate()
-# MODEL_PATH = "galaxy_rf_pipeline_model"
-MODEL_PATH = "full_pipeline_model"
-model = PipelineModel.load(MODEL_PATH)
-print("Spark model loaded successfully")
+MODEL_PATH_1 = "full_pipeline_model"
+MODEL_PATH_2 = "galaxy_rf_pipeline_model"
+
+model_1 = PipelineModel.load(MODEL_PATH_1)
+print("Spark model_1 loaded successfully")
+
+model_2 = PipelineModel.load(MODEL_PATH_2)
+print("Spark model_2 loaded successfully")
 
 # -----------------------------
 # Get class names
 # -----------------------------
-for stage in model.stages:
+for stage in model_1.stages:
     if isinstance(stage, StringIndexerModel) and stage.getOutputCol() == "label_index":
-        class_names = stage.labels
+        class_names_1 = stage.labels
 
-features = ["u", "g", "r", "i", "z", "u_g", "g_r", "r_i", "i_z"]
-
+class_names_2 = ['GALAXY', 'STAR', 'QSO']
 # -----------------------------
 # Continuous listening loop
 # -----------------------------
@@ -61,13 +64,21 @@ try:
     for message in consumer:
         data = message.value
         print(f"Received input: {data}")
+        model_n = data[0]
+        data = data[1]
 
         # Convert dict to Spark DataFrame
         input_df = spark.createDataFrame([Row(**data)])
-        input_df = input_df.withColumn("u_g", col("u") - col("g")) \
-            .withColumn("g_r", col("g") - col("r")) \
-            .withColumn("r_i", col("r") - col("i")) \
-            .withColumn("i_z", col("i") - col("z"))
+        if model_n == 'm1':
+            model = model_1
+            class_names = class_names_1
+            input_df = input_df.withColumn("u_g", col("u") - col("g")) \
+                .withColumn("g_r", col("g") - col("r")) \
+                .withColumn("r_i", col("r") - col("i")) \
+                .withColumn("i_z", col("i") - col("z"))
+        else:
+            model = model_2
+            class_names = class_names_2
 
         # Predict
         predictions = model.transform(input_df)
